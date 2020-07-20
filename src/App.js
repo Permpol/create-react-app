@@ -51,11 +51,8 @@ function App() {
       <br />
       <h2>The date according to Go is:</h2>
       <p>{date ? date : 'Loading date...'}</p>
-    </main>
-  );
-}
-
-export default class App extends React.Component {
+    
+    export default class App extends React.Component {
   //Initial state false for the switch. You can change it to true just to see.
   state = { switchValue: false };
 
@@ -90,6 +87,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+    </main>
+  );
+}
+
+
 
 
 export default App;
