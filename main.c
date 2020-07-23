@@ -7,55 +7,48 @@
  * @brief
  */
 
-//#define BLYNK_DEBUG
-#define BLYNK_PRINT stdout
-#ifdef RASPBERRY
-  #include <BlynkApiWiringPi.h>
-#else
-  #include <BlynkApiLinux.h>
-#endif
-#include <BlynkSocket.h>
-#include <BlynkOptionsParser.h>
+#include "freertos/FreeRTOS.h"
+#include "esp_wifi.h"
+#include "esp_system.h"
+#include "esp_event.h"
+#include "esp_event_loop.h"
+#include "nvs_flash.h"
+#include "driver/gpio.h"
 
-static BlynkTransportSocket _blynkTransport;
-BlynkSocket Blynk(_blynkTransport);
-
-static const char *auth, *serv;
-static uint16_t port;
-
-#include <BlynkWidgets.h>
-
-BlynkTimer tmr;
-
-BLYNK_WRITE(V1)
+esp_err_t event_handler(void *ctx, system_event_t *event)
 {
-    printf("Got a value: %s\n", param[0].asStr());
-}
-
-void setup()
-{
-    Blynk.begin(auth, serv, port);
-    tmr.setInterval(1000, [](){
-      Blynk.virtualWrite(V0, BlynkMillis()/1000);
-    });
-}
-
-void loop()
-{
-    Blynk.run();
-    tmr.run();
-}
-
-
-int main(int argc, char* argv[])
-{
-    parse_options(argc, argv, auth, serv, port);
-
-    setup();
-    while(true) {
-        loop();
+    printf("system event 0x%x\n", event->event_id);
+    if (event->event_id == SYSTEM_EVENT_STA_DISCONNECTED) {
+        const system_event_sta_disconnected_t *info = &event->event_info.disconnected;
+        printf("SYSTEM_EVENT_STA_DISCONNECTED reason %d\n", info->reason);
     }
-
-    return 0;
+    return ESP_OK;
 }
 
+void app_main(void)
+{
+    nvs_flash_init();
+    tcpip_adapter_init();
+    ESP_ERROR_CHECK( esp_event_loop_init(event_handler, NULL) );
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
+    ESP_ERROR_CHECK( esp_wifi_set_storage(WIFI_STORAGE_RAM) );
+    ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
+    wifi_config_t sta_config = {
+        .sta = {
+            .ssid = "ssid_here",
+            .password = "pass_here",
+        }
+    };
+    ESP_ERROR_CHECK( esp_wifi_set_config(WIFI_IF_STA, &sta_config) );
+    ESP_ERROR_CHECK( esp_wifi_start() );
+    ESP_ERROR_CHECK( esp_wifi_connect() );
+
+    gpio_set_direction(GPIO_NUM_4, GPIO_MODE_OUTPUT);
+    int level = 0;
+    while (true) {
+        gpio_set_level(GPIO_NUM_4, level);
+        level = !level;
+        vTaskDelay(300 / portTICK_PERIOD_MS);
+    }
+}
